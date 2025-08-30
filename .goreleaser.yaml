@@ -1,0 +1,24 @@
+project_name: go-aws-eks-get-token
+
+builds:
+  - main: ./main.go
+    ldflags:
+      - -s -w
+
+archives:
+  - format: tar.gz
+
+release:
+  github:
+    owner: michaelvl
+    name: go-aws-eks-get-token
+
+checksum:
+  name_template: 'checksums.txt'
+
+changelog:
+  sort: desc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
