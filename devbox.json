@@ -1,0 +1,9 @@
+{
+    "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.13.7/.schema/devbox.schema.json",
+    "packages": [
+      "gnumake@4.4.1",
+      "go@1.24.5",
+      "golangci-lint@2.3.1",
+    ],
+  }
+  
