@@ -3,7 +3,7 @@ APP=go-aws-eks-get-token
 .PHONY: build lint clean
 
 build:
-	go build -o $(APP) main.go
+	CGO_ENABLED=0 go build -o $(APP) main.go
 
 lint:
 	golangci-lint run

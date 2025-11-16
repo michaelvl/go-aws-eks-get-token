@@ -1,18 +1,23 @@
 package main
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"os/user"
 	"path/filepath"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/sts"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/aws/smithy-go/middleware"
+	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
 // ExecCredential is the format for kubectl ExecCredential
@@ -82,30 +87,60 @@ func main() {
 		return
 	}
 
-	// Set up AWS session
-	sess, err := session.NewSessionWithOptions(session.Options{
-		Config: aws.Config{
-			Region: aws.String(*region),
-		},
-		Profile:           profile,
-		SharedConfigState: session.SharedConfigEnable,
-	})
+	// Create context for AWS operations
+	ctx := context.Background()
+
+	// Set up AWS configuration
+	cfg, err := config.LoadDefaultConfig(ctx,
+		config.WithRegion(*region),
+		config.WithSharedConfigProfile(profile),
+	)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to create AWS session: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Failed to load AWS config: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Get caller identity
-	stsSvc := sts.New(sess)
-	req, _ := stsSvc.GetCallerIdentityRequest(&sts.GetCallerIdentityInput{})
-	req.HTTPRequest.Header.Add("x-k8s-aws-id", *cluster)
+	// Create STS client and presign client
+	stsSvc := sts.NewFromConfig(cfg)
 
-	// Presign the request with max duration (15m)
-	urlStr, err := req.Presign(time.Duration(maxTokenDuration.Seconds()))
+	// Create custom presigner with expiration support
+	presigner := v4.NewSigner()
+	customPresigner := &eksPresigner{
+		signer:  presigner,
+		expires: maxTokenDuration,
+	}
+
+	presignClient := sts.NewPresignClient(stsSvc, func(po *sts.PresignOptions) {
+		po.Presigner = customPresigner
+	})
+
+	// Presign the GetCallerIdentity request with custom header
+	presignResult, err := presignClient.PresignGetCallerIdentity(ctx,
+		&sts.GetCallerIdentityInput{},
+		func(po *sts.PresignOptions) {
+			po.ClientOptions = append(po.ClientOptions, func(o *sts.Options) {
+				o.APIOptions = append(o.APIOptions, func(stack *middleware.Stack) error {
+					return stack.Build.Add(middleware.BuildMiddlewareFunc(
+						"AddEKSHeader",
+						func(ctx context.Context, in middleware.BuildInput, next middleware.BuildHandler) (
+							middleware.BuildOutput, middleware.Metadata, error,
+						) {
+							if req, ok := in.Request.(*smithyhttp.Request); ok {
+								req.Header.Add("x-k8s-aws-id", *cluster)
+							}
+							return next.HandleBuild(ctx, in)
+						},
+					), middleware.Before)
+				})
+			})
+		},
+	)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to presign STS request: %v\n", err)
 		os.Exit(1)
 	}
+
+	urlStr := presignResult.URL
 
 	token := "k8s-aws-v1." + encodeBase64Url(urlStr)
 	expiry := time.Now().Add(maxTokenDuration).UTC().Format(time.RFC3339)
@@ -174,4 +209,29 @@ func kubeCacheFilePath(cluster string) (string, error) {
 
 	filename := fmt.Sprintf("eks-token-%s.json", cluster)
 	return filepath.Join(cacheDir, filename), nil
+}
+
+// eksPresigner is a custom presigner that adds X-Amz-Expires query parameter for EKS tokens
+type eksPresigner struct {
+	signer  *v4.Signer
+	expires time.Duration
+}
+
+// PresignHTTP implements the HTTPPresignerV4 interface with custom expiration
+func (p *eksPresigner) PresignHTTP(
+	ctx context.Context,
+	credentials aws.Credentials,
+	r *http.Request,
+	payloadHash string,
+	service string,
+	region string,
+	signingTime time.Time,
+	optFns ...func(*v4.SignerOptions),
+) (string, http.Header, error) {
+	// Add X-Amz-Expires query parameter before signing
+	q := r.URL.Query()
+	q.Set("X-Amz-Expires", fmt.Sprintf("%d", int(p.expires.Seconds())))
+	r.URL.RawQuery = q.Encode()
+
+	return p.signer.PresignHTTP(ctx, credentials, r, payloadHash, service, region, signingTime, optFns...)
 }
