@@ -6,8 +6,14 @@
     flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nixpkgs, flake-utils }:
-    flake-utils.lib.eachDefaultSystem (system:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      flake-utils,
+    }:
+    flake-utils.lib.eachDefaultSystem (
+      system:
       let
         pkgs = import nixpkgs { inherit system; };
       in
@@ -16,7 +22,7 @@
           pname = "go-aws-eks-get-token";
           version = "0.1.0";
           src = ./.;
-          vendorHash = "sha256-PowXwMRH8JBVjxaJQDPPx0yZzmDZTuKNfwJ6tK6uS7o=";
+          vendorHash = "sha256-JybYfHrz8lv4gHKt7zjCPeT7nWQynw9LhjvbZA65To4=";
           # vendorHash = nixpkgs.lib.fakeHash;
         };
       }
