@@ -75,7 +75,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	cachePath, err := kubeCacheFilePath(*cluster)
+	cachePath, err := kubeCacheFilePath(profile, *cluster)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to get cache path: %v\n", err)
 		os.Exit(1)
@@ -194,7 +194,7 @@ func encodeBase64Url(s string) string {
 }
 
 // kubeCacheFilePath returns the file path for the cached token, ensuring .kube and .kube/cache exist.
-func kubeCacheFilePath(cluster string) (string, error) {
+func kubeCacheFilePath(profile, cluster string) (string, error) {
 	usr, err := user.Current()
 	if err != nil {
 		return "", err
@@ -207,7 +207,7 @@ func kubeCacheFilePath(cluster string) (string, error) {
 		return "", fmt.Errorf("failed to create .kube/cache directory: %w", err)
 	}
 
-	filename := fmt.Sprintf("eks-token-%s.json", cluster)
+	filename := fmt.Sprintf("eks-token-%s-%s.json", profile, cluster)
 	return filepath.Join(cacheDir, filename), nil
 }
 
