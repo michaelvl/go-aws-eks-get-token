@@ -27,19 +27,11 @@ yq eval -i  '(.users[] | select(.user.exec.command == "aws") | .user.exec.comman
 3. Remember to set `AWS_PROFILE=<profile name>" for all users in `~/kube/.config`
 Fx.
 ```
-- name: <name of user>
+- name: <your user's name>
   user:
     exec:
       apiVersion: client.authentication.k8s.io/v1beta1
-      args:
-      - --region
-      - eu-central-1
-      - eks
-      - get-token
-      - --cluster-name
-      - cluster-7
-      - --output
-      - json
+      ...
       command: go-aws-eks-get-token
       env:
         - name: AWS_PROFILE
