@@ -24,8 +24,7 @@ go install github.com/michaelvl/go-aws-eks-get-token@latest
 yq eval -i  '(.users[] | select(.user.exec.command == "aws") | .user.exec.command) = "go-aws-eks-get-token"' ~/.kube/config
 ```
 
-3. Set `AWS_PROFILE=<profile name>` for all users (that uses this tool) in `~/kube/.config`
-Fx.
+3. Set `AWS_PROFILE=<profile name>` for all users (that uses this tool) in `~/kube/.config` as shown below:
 ```
 - name: <your user's name>
   user:
