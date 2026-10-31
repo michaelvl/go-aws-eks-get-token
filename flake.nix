@@ -22,7 +22,7 @@
           pname = "go-aws-eks-get-token";
           version = "0.1.0";
           src = ./.;
-          vendorHash = "sha256-JybYfHrz8lv4gHKt7zjCPeT7nWQynw9LhjvbZA65To4=";
+          vendorHash = "sha256-IGUUb6RglMT/WkYWkcg0HBt0WwVzUyX4lBmygHdpYUQ=";
           # vendorHash = nixpkgs.lib.fakeHash;
         };
       }
